@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HODL IPTV Player</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="./css/styles.css">
+</head>
+<body>
+    <!-- Navbar -->
+    <nav class="navbar navbar-expand-lg navbar-light bg-light">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="#"><img src="./img/logo.png" alt="IPTV Player Logo"></a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item">
+                        <button class="btn btn-outline-secondary me-2" data-bs-toggle="modal" data-bs-target="#settingsModal" data-lang="settings">Settings</button>
+                    </li>
+                    <li class="nav-item">
+                        <button id="logout-btn" class="btn btn-outline-danger d-none" onclick="logout()" data-lang="logout">Logout</button>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Login Section -->
+    <section id="login-section" class="container mt-5 d-none">
+        <div class="row justify-content-center">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h3 data-lang="login-title">Login</h3>
+                    </div>
+                    <div class="card-body">
+                        <ul class="nav nav-tabs" id="loginTab" role="tablist">
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link active" id="url-tab" data-bs-toggle="tab" data-bs-target="#url" type="button" role="tab" aria-controls="url" aria-selected="true" data-lang="url-tab">URL</button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link" id="file-tab" data-bs-toggle="tab" data-bs-target="#file" type="button" role="tab" aria-controls="file" aria-selected="false" data-lang="file-tab">File</button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link" id="api-tab" data-bs-toggle="tab" data-bs-target="#api" type="button" role="tab" aria-controls="api" aria-selected="false">API</button>
+                            </li>
+                        </ul>
+                        <div class="tab-content mt-3" id="loginTabContent">
+                            <!-- M3U URL -->
+                            <div class="tab-pane fade show active" id="url" role="tabpanel" aria-labelledby="url-tab">
+                                <div class="mb-3">
+                                    <label for="m3u-url" class="form-label">M3U URL</label>
+                                    <input type="text" class="form-control" id="m3u-url" placeholder="Enter M3U URL">
+                                </div>
+                                <button class="btn btn-primary w-100" onclick="parseM3UUrl()" data-lang="login-m3u">Login with M3U URL</button>
+                            </div>
+                            <!-- M3U File -->
+                            <div class="tab-pane fade" id="file" role="tabpanel" aria-labelledby="file-tab">
+                                <div class="mb-3">
+                                    <label for="m3u-file" class="form-label">M3U File</label>
+                                    <input type="file" class="form-control" id="m3u-file" accept=".m3u,.txt,.json">
+                                </div>
+                                <button class="btn btn-primary w-100" onclick="parseM3UFile()" data-lang="login-file">Login with File</button>
+                            </div>
+                            <!-- API Login -->
+                            <div class="tab-pane fade" id="api" role="tabpanel" aria-labelledby="api-tab">
+                                <div class="mb-3">
+                                    <label for="server" class="form-label">Server</label>
+                                    <input type="text" class="form-control" id="server" placeholder="http://example.com:port">
+                                </div>
+                                <div class="mb-3">
+                                    <label for="username" class="form-label">Username</label>
+                                    <input type="text" class="form-control" id="username" placeholder="Enter username">
+                                </div>
+                                <div class="mb-3">
+                                    <label for="password" class="form-label">Password</label>
+                                    <input type="password" class="form-control" id="password" placeholder="Enter password">
+                                </div>
+                                <button class="btn btn-primary w-100" onclick="login()" data-lang="login-api">Login</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Main Section -->
+    <section id="main-section" class="d-none">
+        <!-- Categories -->
+        <div id="categories-section" class="container-fluid">
+            <div id="categories" class="row mt-3"></div>
+        </div>
+        <!-- Channels -->
+        <div id="channels-section" class="d-none">
+            <button id="back-to-categories" class="btn btn-outline-secondary mb-3" onclick="showCategories()" data-lang="back-categories">← Back to Categories</button>
+            <div class="channels-header">
+                <div class="channel-stats">
+                    <span data-lang="total">Total:</span> <span id="total-channels">0</span>
+                    <span data-lang="active">Active:</span> <span id="active-channels">0</span>
+                    <span data-lang="offline">Offline:</span> <span id="offline-channels">0</span>
+                </div>
+                <input type="text" id="channels-search" class="form-control" placeholder="Search channels..." data-lang="search-placeholder">
+            </div>
+            <div id="channels" class="channels-list"></div>
+        </div>
+    </section>
+
+    <!-- Video Modal -->
+    <div class="modal fade modal-fullscreen" id="videoModal" tabindex="-1" aria-labelledby="videoModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="videoModalLabel">Stream</h5>
+                    <button type="button" class="close-btn" data-bs-dismiss="modal" aria-label="Close">×</button>
+                </div>
+                <div class="modal-body">
+                    <div class="video-container">
+                        <video id="video-player" controls autoplay></video>
+                        <div id="player-notification" class="player-notification"></div>
+                        <div class="playback-controls">
+                            <button class="btn btn-sm btn-outline-light" onclick="rewind()"><i class="fas fa-backward"></i></button>
+                            <button class="btn btn-sm btn-outline-light" onclick="fastForward()"><i class="fas fa-forward"></i></button>
+                        </div>
+                    </div>
+                    <div class="mt-3">
+                        <label for="subtitle-file" class="form-label" data-lang="subtitles">Subtitles:</label>
+                        <input type="file" class="form-control d-inline-block w-auto" id="subtitle-file" accept=".srt,.vtt">
+                        <button class="btn btn-outline-secondary mt-2" onclick="loadSubtitles()">Load Subtitles</button>
+                    </div>
+                    <div id="epg-container" class="epg-container">
+                        <h6 data-lang="epg-title">EPG (Electronic Program Guide)</h6>
+                        <div id="epg"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div class="modal fade" id="settingsModal" tabindex="-1" aria-labelledby="settingsModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="settingsModalLabel" data-lang="settings-title">Settings</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="language-select" class="form-label">Language:</label>
+                        <select id="language-select" class="form-select" onchange="changeLanguage()">
+                            <option value="en">English</option>
+                            <option value="es">Español</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="layout-select" class="form-label" data-lang="layout">Layout:</label>
+                        <select id="layout-select" class="form-select" onchange="updateLayout()">
+                            <option value="grid" data-lang="grid">Grid</option>
+                            <option value="list" data-lang="list">List</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="card-size" class="form-label" data-lang="card-size">Card Size:</label>
+                        <input type="range" class="form-range" id="card-size" min="200" max="400" value="280" onchange="updateCardSize()">
+                    </div>
+                    <div class="mb-3 form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="dark-mode-toggle" onchange="toggleDarkMode()">
+                        <label class="form-check-label" for="dark-mode-toggle" data-lang="dark-mode">Toggle Dark Mode</label>
+                    </div>
+                    <div class="mb-3">
+                        <label for="theme-select" class="form-label">Theme:</label>
+                        <select id="theme-select" class="form-select" onchange="applyTheme()">
+                            <option value="default">Default</option>
+                            <option value="blue">Blue</option>
+                            <option value="green">Green</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Parental Controls:</label>
+                        <div class="form-check">
+                            <input type="checkbox" class="form-check-input" id="parental-toggle" onchange="toggleParentalControls()">
+                            <label class="form-check-label" for="parental-toggle">Enable</label>
+                        </div>
+                        <input type="text" class="form-control mt-2" id="restricted-categories" placeholder="Enter restricted categories (comma-separated)">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" data-lang="close">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading Spinner -->
+    <div id="loading-spinner" class="position-fixed top-50 start-50 translate-middle d-none">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+    </div>
+
+    <!-- Error Toast -->
+    <div class="toast" role="alert" aria-live="assertive" aria-atomic="true" id="error-toast">
+        <div class="toast-header">
+            <strong class="me-auto" data-lang="error">Error</strong>
+            <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
+        </div>
+        <div class="toast-body" id="error-message"></div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container-fluid text-center">
+            <p class="credit">Developed by Bugsfree Studio © 2025</p>
+            <p class="disclaimer">Disclaimer: This IPTV player is provided for personal use only. We are not responsible for the content streamed through this application. Users must ensure they have the legal right to access and view the content.</p>
+        </div>
+    </footer>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- HLS.js -->
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+    <!-- Custom JS -->
+    <script src="./js/script.js"></script>
+</body>
+</html>
