@@ -115,7 +115,7 @@
 
     <!-- Video Modal -->
     <div class="modal fade modal-fullscreen" id="videoModal" tabindex="-1" aria-labelledby="videoModalLabel" aria-hidden="true">
-        <div class="modal-dialog">
+        <div class="modal-dialog modal-fullscreen">
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title" id="videoModalLabel">Stream</h5>
@@ -125,17 +125,21 @@
                     <div class="video-container">
                         <video id="video-player" controls autoplay></video>
                         <div id="player-notification" class="player-notification"></div>
-                        <div class="playback-controls">
-                            <button class="btn btn-sm btn-outline-light" onclick="rewind()"><i class="fas fa-backward"></i></button>
-                            <button class="btn btn-sm btn-outline-light" onclick="fastForward()"><i class="fas fa-forward"></i></button>
+                        <button class="btn btn-sm btn-outline-light pip-btn" onclick="togglePictureInPicture()">
+                            <i class="fas fa-window-restore"></i>
+                        </button>
+                    </div>
+                    <div class="player-controls">
+                        <div class="subtitle-controls">
+                            <input type="file" class="form-control subtitle-input" id="subtitle-file" accept=".srt,.vtt">
+                            <button class="btn btn-outline-secondary subtitle-btn" onclick="loadSubtitles()">Load</button>
+                        </div>
+                        <div class="channel-navigation">
+                            <button class="btn btn-outline-light" onclick="previousChannel()"><i class="fas fa-arrow-left"></i> Previous</button>
+                            <button class="btn btn-outline-light" onclick="nextChannel()">Next <i class="fas fa-arrow-right"></i></button>
                         </div>
                     </div>
-                    <div class="mt-3">
-                        <label for="subtitle-file" class="form-label" data-lang="subtitles">Subtitles:</label>
-                        <input type="file" class="form-control d-inline-block w-auto" id="subtitle-file" accept=".srt,.vtt">
-                        <button class="btn btn-outline-secondary mt-2" onclick="loadSubtitles()">Load Subtitles</button>
-                    </div>
-                    <div id="epg-container" class="epg-container">
+                    <div id="epg-container" class="epg-container d-none">
                         <h6 data-lang="epg-title">EPG (Electronic Program Guide)</h6>
                         <div id="epg"></div>
                     </div>
@@ -176,20 +180,24 @@
                         <label class="form-check-label" for="dark-mode-toggle" data-lang="dark-mode">Toggle Dark Mode</label>
                     </div>
                     <div class="mb-3">
-                        <label for="theme-select" class="form-label">Theme:</label>
-                        <select id="theme-select" class="form-select" onchange="applyTheme()">
-                            <option value="default">Default</option>
-                            <option value="blue">Blue</option>
-                            <option value="green">Green</option>
-                        </select>
-                    </div>
-                    <div class="mb-3">
                         <label class="form-label">Parental Controls:</label>
                         <div class="form-check">
                             <input type="checkbox" class="form-check-input" id="parental-toggle" onchange="toggleParentalControls()">
                             <label class="form-check-label" for="parental-toggle">Enable</label>
                         </div>
                         <input type="text" class="form-control mt-2" id="restricted-categories" placeholder="Enter restricted categories (comma-separated)">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Custom Playlists:</label>
+                        <input type="text" class="form-control" id="playlist-name" placeholder="Enter playlist name">
+                        <button class="btn btn-outline-primary mt-2" onclick="createPlaylist()">Create Playlist</button>
+                        <select id="playlists-select" class="form-select mt-2" onchange="loadPlaylist()">
+                            <option value="">Select a Playlist</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Offline Cache:</label>
+                        <button class="btn btn-outline-info" onclick="cacheChannels()">Cache Channels for Offline</button>
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -198,6 +206,9 @@
             </div>
         </div>
     </div>
+
+    <!-- Multi-Window Container -->
+    <div id="multi-window-container" class="multi-window-container"></div>
 
     <!-- Loading Spinner -->
     <div id="loading-spinner" class="position-fixed top-50 start-50 translate-middle d-none">
