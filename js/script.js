@@ -27,11 +27,9 @@ const languageSelect = document.getElementById('language-select');
 const layoutSelect = document.getElementById('layout-select');
 const cardSizeInput = document.getElementById('card-size');
 const darkModeToggle = document.getElementById('dark-mode-toggle');
+const themeSelect = document.getElementById('theme-select');
 const parentalToggle = document.getElementById('parental-toggle');
 const restrictedCategoriesInput = document.getElementById('restricted-categories');
-const playlistNameInput = document.getElementById('playlist-name');
-const playlistsSelect = document.getElementById('playlists-select');
-const multiWindowContainer = document.getElementById('multi-window-container');
 
 let baseUrl = '';
 let username = '';
@@ -42,8 +40,6 @@ let originalPlaylist = [];
 let favorites = JSON.parse(localStorage.getItem('favorites') || '[]');
 let viewingHistory = JSON.parse(localStorage.getItem('viewingHistory') || '[]');
 let watchLater = JSON.parse(localStorage.getItem('watchLater') || '[]');
-let customPlaylists = JSON.parse(localStorage.getItem('customPlaylists') || '{}');
-let cachedChannels = JSON.parse(localStorage.getItem('cachedChannels') || '[]');
 let currentLanguage = localStorage.getItem('language') || 'en';
 let isInitialCheckDone = false;
 const STATUS_CHECK_INTERVAL = 10000;
@@ -51,8 +47,7 @@ const BATCH_SIZE = 50;
 let currentFilter = 'all';
 let userProfiles = JSON.parse(localStorage.getItem('userProfiles') || '{}');
 let currentUser = null;
-let multiWindows = {};
-let currentChannelIndex = -1;
+let theme = localStorage.getItem('theme') || 'default';
 
 const translations = {
     en: {
@@ -84,12 +79,7 @@ const translations = {
         'watch-later': 'Watch Later',
         'share': 'Share',
         'favorites-btn': 'Favorites',
-        'watch-later-btn': 'Watch Later',
-        'sort-name': 'Sort by Name',
-        'sort-status': 'Sort by Status',
-        'sort-category': 'Sort by Category',
-        'recently-watched': 'Recently Watched',
-        'most-played': 'Most Played'
+        'watch-later-btn': 'Watch Later'
     },
     es: {
         'login-title': 'Iniciar Sesión',
@@ -120,12 +110,7 @@ const translations = {
         'watch-later': 'Ver Más Tarde',
         'share': 'Compartir',
         'favorites-btn': 'Favoritos',
-        'watch-later-btn': 'Ver Más Tarde',
-        'sort-name': 'Ordenar por Nombre',
-        'sort-status': 'Ordenar por Estado',
-        'sort-category': 'Ordenar por Categoría',
-        'recently-watched': 'Visto Recientemente',
-        'most-played': 'Más Reproducido'
+        'watch-later-btn': 'Ver Más Tarde'
     }
 };
 
@@ -138,8 +123,9 @@ window.onload = function () {
         darkModeToggle.checked = true;
     }
     languageSelect.value = currentLanguage;
+    themeSelect.value = theme;
+    applyTheme();
     changeLanguage();
-    updatePlaylistSelect();
     
     if (credentials || storedPlaylist) {
         showUserProfileSelection();
@@ -168,6 +154,16 @@ function toggleDarkMode() {
         userProfiles[currentUser].darkMode = isDark;
         saveUserProfiles();
     }
+}
+
+function applyTheme() {
+    document.body.className = document.body.className.replace(/theme-\w+/g, '');
+    document.body.classList.add(`theme-${theme}`);
+    if (currentUser) {
+        userProfiles[currentUser].theme = theme;
+        saveUserProfiles();
+    }
+    themeSelect.value = theme; // Ensure theme select reflects current theme
 }
 
 function changeLanguage() {
@@ -212,9 +208,9 @@ function addNewProfile() {
             favorites: [],
             viewingHistory: [],
             watchLater: [],
-            customPlaylists: {},
             darkMode: false,
             language: 'en',
+            theme: 'default',
             parentalControls: { enabled: false, restrictedCategories: [] }
         };
         saveUserProfiles();
@@ -227,16 +223,17 @@ function loadUserProfile(profile) {
     favorites = userProfiles[profile].favorites;
     viewingHistory = userProfiles[profile].viewingHistory;
     watchLater = userProfiles[profile].watchLater;
-    customPlaylists = userProfiles[profile].customPlaylists || {};
     document.body.classList.toggle('dark-mode', userProfiles[profile].darkMode);
     darkModeToggle.checked = userProfiles[profile].darkMode;
     localStorage.setItem('darkMode', userProfiles[profile].darkMode);
     languageSelect.value = userProfiles[profile].language;
     currentLanguage = userProfiles[profile].language;
+    theme = userProfiles[profile].theme;
+    themeSelect.value = theme;
     parentalToggle.checked = userProfiles[profile].parentalControls.enabled;
     restrictedCategoriesInput.value = userProfiles[profile].parentalControls.restrictedCategories.join(',');
+    applyTheme();
     changeLanguage();
-    updatePlaylistSelect();
 
     const credentials = localStorage.getItem('iptvCredentials');
     const storedPlaylist = localStorage.getItem('iptvPlaylist');
@@ -263,15 +260,10 @@ function loadUserProfile(profile) {
             isInitialCheckDone = true;
         }
         displayRecommendations();
-    } else if (cachedChannels.length) {
-        displayChannels(cachedChannels, 'Offline Cache');
     }
 }
 
 function saveUserProfiles() {
-    if (currentUser) {
-        userProfiles[currentUser].customPlaylists = customPlaylists;
-    }
     localStorage.setItem('userProfiles', JSON.stringify(userProfiles));
 }
 
@@ -356,8 +348,7 @@ function parsePlaylistContent(content, type) {
                     url: '',
                     status: 'unknown',
                     index: index++,
-                    epg: [],
-                    playCount: 0
+                    epg: []
                 };
             } else if (line.trim().startsWith('http') && currentChannel) {
                 currentChannel.url = line.trim();
@@ -378,8 +369,7 @@ function parsePlaylistContent(content, type) {
                             url: item.url,
                             status: 'unknown',
                             index,
-                            epg: [],
-                            playCount: 0
+                            epg: []
                         });
                     }
                 });
@@ -482,14 +472,12 @@ function logout() {
         userProfiles[currentUser].favorites = favorites;
         userProfiles[currentUser].viewingHistory = viewingHistory;
         userProfiles[currentUser].watchLater = watchLater;
-        userProfiles[currentUser].customPlaylists = customPlaylists;
         saveUserProfiles();
     }
     playlist = [];
     originalPlaylist = [];
     viewingHistory = [];
     watchLater = [];
-    customPlaylists = {};
     currentUser = null;
     loginSection.classList.remove('d-none');
     mainSection.classList.add('d-none');
@@ -521,7 +509,7 @@ async function loadChannels(categoryId, categoryName) {
         if (!response.ok) throw new Error('Invalid response from server.');
         const channels = await response.json();
         if (channels && channels.length > 0) {
-            channels.forEach((ch, idx) => { ch.index = idx; ch.playCount = 0; });
+            channels.forEach((ch, idx) => ch.index = idx);
             categoriesSection.classList.add('d-none');
             channelsSection.classList.remove('d-none');
             backButton.style.display = 'block';
@@ -561,10 +549,6 @@ function displayChannels(channels, categoryName) {
         filteredChannels = channels.filter(ch => ch.status === 'active');
     } else if (currentFilter === 'offline') {
         filteredChannels = channels.filter(ch => ch.status === 'offline');
-    } else if (currentFilter === 'recently-watched') {
-        filteredChannels = channels.filter(ch => viewingHistory.some(h => h.name === ch.name));
-    } else if (currentFilter === 'most-played') {
-        filteredChannels = channels.sort((a, b) => (b.playCount || 0) - (a.playCount || 0)).slice(0, 20);
     }
 
     const container = document.createElement('div');
@@ -609,17 +593,13 @@ function displayChannels(channels, categoryName) {
                             </div>
                         </div>
                         <div class="channel-actions">
-                            <button class="fav-btn ${favorites.includes(ch.index) ? 'active' : ''}" onclick="toggleFavorite(${ch.index}, event)">
+                            <button class="fav-btn ${favorites.includes(ch.index) ? 'active' : ''}" 
+                                    onclick="toggleFavorite(${ch.index}, event)">
                                 <i class="fas fa-star"></i>
                             </button>
-                            <button class="watch-later-btn ${watchLater.includes(ch.index) ? 'active' : ''}" onclick="toggleWatchLater(${ch.index}, event)">
+                            <button class="watch-later-btn ${watchLater.includes(ch.index) ? 'active' : ''}" 
+                                    onclick="toggleWatchLater(${ch.index}, event)">
                                 <i class="fas fa-clock"></i>
-                            </button>
-                            <button class="playlist-btn" onclick="addToPlaylist(${ch.index}, event)">
-                                <i class="fas fa-list"></i>
-                            </button>
-                            <button class="multi-window-btn" onclick="openMultiWindow('${ch.index}', '${ch.name}', event)">
-                                <i class="fas fa-tv"></i>
                             </button>
                             <button class="share-btn" onclick="shareChannel('${ch.name}', '${ch.url || ''}', event)">
                                 <i class="fas fa-share-alt"></i>
@@ -659,17 +639,13 @@ function displayChannels(channels, categoryName) {
                         </div>
                     </div>
                     <div class="channel-actions">
-                        <button class="fav-btn ${favorites.includes(ch.index) ? 'active' : ''}" onclick="toggleFavorite(${ch.index}, event)">
+                        <button class="fav-btn ${favorites.includes(ch.index) ? 'active' : ''}" 
+                                onclick="toggleFavorite(${ch.index}, event)">
                             <i class="fas fa-star"></i>
                         </button>
-                        <button class="watch-later-btn ${watchLater.includes(ch.index) ? 'active' : ''}" onclick="toggleWatchLater(${ch.index}, event)">
+                        <button class="watch-later-btn ${watchLater.includes(ch.index) ? 'active' : ''}" 
+                                onclick="toggleWatchLater(${ch.index}, event)">
                             <i class="fas fa-clock"></i>
-                        </button>
-                        <button class="playlist-btn" onclick="addToPlaylist(${ch.index}, event)">
-                            <i class="fas fa-list"></i>
-                        </button>
-                        <button class="multi-window-btn" onclick="openMultiWindow('${ch.index}', '${ch.name}', event)">
-                            <i class="fas fa-tv"></i>
                         </button>
                         <button class="share-btn" onclick="shareChannel('${ch.name}', '${baseUrl}/live/${username}/${password}/${ch.index}.m3u8', event)">
                             <i class="fas fa-share-alt"></i>
@@ -759,69 +735,6 @@ function showWatchLater() {
     displayChannels(watchLaterChannels, 'Watch Later');
 }
 
-function createPlaylist() {
-    const playlistName = playlistNameInput.value.trim();
-    if (!playlistName) { showError('Please enter a playlist name.'); return; }
-    if (customPlaylists[playlistName]) { showError('Playlist already exists.'); return; }
-
-    customPlaylists[playlistName] = [];
-    localStorage.setItem('customPlaylists', JSON.stringify(customPlaylists));
-    if (currentUser) {
-        userProfiles[currentUser].customPlaylists = customPlaylists;
-        saveUserProfiles();
-    }
-    updatePlaylistSelect();
-    playlistNameInput.value = '';
-    showPlayerNotification(`Playlist "${playlistName}" created!`);
-}
-
-function updatePlaylistSelect() {
-    playlistsSelect.innerHTML = '<option value="">Select a Playlist</option>' + 
-        Object.keys(customPlaylists).map(name => `<option value="${name}">${name}</option>`).join('');
-}
-
-function loadPlaylist() {
-    const playlistName = playlistsSelect.value;
-    if (playlistName) {
-        const playlistChannels = (playlist.length ? playlist : originalPlaylist).filter(ch => 
-            customPlaylists[playlistName].includes(ch.index));
-        displayChannels(playlistChannels, playlistName);
-    }
-}
-
-function addToPlaylist(index, event) {
-    event.stopPropagation();
-    const playlistName = prompt('Enter playlist name to add this channel to:');
-    if (playlistName && customPlaylists[playlistName]) {
-        if (!customPlaylists[playlistName].includes(index)) {
-            customPlaylists[playlistName].push(index);
-            localStorage.setItem('customPlaylists', JSON.stringify(customPlaylists));
-            if (currentUser) {
-                userProfiles[currentUser].customPlaylists = customPlaylists;
-                saveUserProfiles();
-            }
-            showPlayerNotification(`Channel added to ${playlistName}!`);
-        } else {
-            showPlayerNotification('Channel already in playlist.');
-        }
-    } else {
-        showError('Invalid playlist name.');
-    }
-}
-
-function cacheChannels() {
-    const channelsToCache = (playlist.length ? playlist : originalPlaylist).map(ch => ({
-        name: ch.name,
-        logo: ch.logo || ch.stream_icon || '',
-        category: ch.category,
-        index: ch.index,
-        status: ch.status
-    }));
-    localStorage.setItem('cachedChannels', JSON.stringify(channelsToCache));
-    cachedChannels = channelsToCache;
-    showPlayerNotification('Channels cached for offline use!');
-}
-
 function setupSearch() {
     channelsSearch.addEventListener('input', () => {
         const query = channelsSearch.value.toLowerCase();
@@ -845,11 +758,6 @@ function setupFilterButtons() {
             <button class="btn btn-sm btn-outline-info resync-btn" onclick="resyncPlaylist()">Resync</button>
             <button class="btn btn-sm btn-outline-warning favorites-btn" onclick="showFavorites()" data-lang="favorites-btn">${translations[currentLanguage]['favorites-btn']}</button>
             <button class="btn btn-sm btn-outline-primary watch-later-btn" onclick="showWatchLater()" data-lang="watch-later-btn">${translations[currentLanguage]['watch-later-btn']}</button>
-            <button class="btn btn-sm btn-outline-secondary sort-btn" data-sort="name" data-lang="sort-name">${translations[currentLanguage]['sort-name']}</button>
-            <button class="btn btn-sm btn-outline-secondary sort-btn" data-sort="status" data-lang="sort-status">${translations[currentLanguage]['sort-status']}</button>
-            <button class="btn btn-sm btn-outline-secondary sort-btn" data-sort="category" data-lang="sort-category">${translations[currentLanguage]['sort-category']}</button>
-            <button class="btn btn-sm btn-outline-info filter-btn" data-filter="recently-watched" data-lang="recently-watched">${translations[currentLanguage]['recently-watched']}</button>
-            <button class="btn btn-sm btn-outline-info filter-btn" data-filter="most-played" data-lang="most-played">${translations[currentLanguage]['most-played']}</button>
         `;
         header.appendChild(filterDiv);
 
@@ -861,23 +769,8 @@ function setupFilterButtons() {
                 displayChannels(playlist.length ? playlist : originalPlaylist, 'All Channels');
             });
         });
-        document.querySelectorAll('.sort-btn').forEach(btn => {
-            btn.addEventListener('click', () => sortChannels(btn.dataset.sort));
-        });
         document.querySelector('.filter-btn[data-filter="all"]').classList.add('active');
     }
-}
-
-function sortChannels(criteria) {
-    let channels = playlist.length ? playlist : originalPlaylist;
-    if (criteria === 'name') {
-        channels.sort((a, b) => a.name.localeCompare(b.name));
-    } else if (criteria === 'status') {
-        channels.sort((a, b) => (b.status === 'active' ? 1 : 0) - (a.status === 'active' ? 1 : 0));
-    } else if (criteria === 'category') {
-        channels.sort((a, b) => a.category.localeCompare(b.category));
-    }
-    displayChannels(channels, 'All Channels');
 }
 
 async function playStream(streamIndex, channelName) {
@@ -891,21 +784,14 @@ async function playStream(streamIndex, channelName) {
     videoPlayer.load();
 
     let streamUrl;
-    let channel;
-    currentChannelIndex = parseInt(streamIndex);
     if (playlist.length > 0) {
-        channel = playlist[currentChannelIndex];
-        streamUrl = channel.url;
-        channel.playCount = (channel.playCount || 0) + 1;
-        viewingHistory.push({ name: channelName, category: channel.category, timestamp: Date.now() });
+        streamUrl = playlist[parseInt(streamIndex)].url;
+        viewingHistory.push({ name: channelName, category: playlist[parseInt(streamIndex)].category, timestamp: Date.now() });
     } else {
         const serverUrl = baseUrl.split('/player_api.php')[0];
         streamUrl = `${serverUrl}/live/${username}/${password}/${streamIndex}.m3u8`;
-        channel = originalPlaylist[currentChannelIndex];
-        channel.playCount = (channel.playCount || 0) + 1;
         viewingHistory.push({ name: channelName, category: 'API', timestamp: Date.now() });
     }
-    localStorage.setItem('iptvPlaylist', JSON.stringify(playlist));
     localStorage.setItem('viewingHistory', JSON.stringify(viewingHistory.slice(-50)));
     if (currentUser) {
         userProfiles[currentUser].viewingHistory = viewingHistory;
@@ -961,45 +847,20 @@ async function playStream(streamIndex, channelName) {
             videoContainer.timeout = setTimeout(() => videoContainer.classList.remove('active'), 2000);
         });
 
-        if (!playlist.length) {
-            const epgData = await loadEPG(streamIndex);
-            if (epgData && epgData.length > 0) {
-                epgContainer.classList.remove('d-none');
-                displayEPG(epgData);
-            } else {
-                epgContainer.classList.add('d-none');
-            }
-        } else {
-            if (playlist[currentChannelIndex].epg && playlist[currentChannelIndex].epg.length > 0) {
-                epgContainer.classList.remove('d-none');
-                displayEPG(playlist[currentChannelIndex].epg);
-            } else {
-                epgContainer.classList.add('d-none');
-            }
+        if (!playlist.length) await loadEPG(streamIndex);
+        else {
+            epgContainer.style.display = 'block';
+            displayEPG(playlist[parseInt(streamIndex)].epg);
         }
+
+        const pipButton = document.createElement('button');
+        pipButton.className = 'btn btn-sm btn-outline-light pip-btn';
+        pipButton.innerHTML = '<i class="fas fa-window-restore"></i>';
+        pipButton.onclick = togglePictureInPicture;
+        document.querySelector('.playback-controls').appendChild(pipButton);
     } catch (error) {
         console.error('Error in playStream:', error);
         showPlayerNotification('An error occurred while playing.');
-    }
-}
-
-function nextChannel() {
-    const channels = playlist.length ? playlist : originalPlaylist;
-    if (currentChannelIndex < channels.length - 1) {
-        currentChannelIndex++;
-        playStream(channels[currentChannelIndex].index, channels[currentChannelIndex].name);
-    } else {
-        showPlayerNotification('This is the last channel.');
-    }
-}
-
-function previousChannel() {
-    if (currentChannelIndex > 0) {
-        currentChannelIndex--;
-        const channels = playlist.length ? playlist : originalPlaylist;
-        playStream(channels[currentChannelIndex].index, channels[currentChannelIndex].name);
-    } else {
-        showPlayerNotification('This is the first channel.');
     }
 }
 
@@ -1011,83 +872,8 @@ function togglePictureInPicture() {
     }
 }
 
-function openMultiWindow(streamIndex, channelName, event) {
-    event.stopPropagation();
-    if (multiWindows[streamIndex]) {
-        multiWindows[streamIndex].window.focus();
-        return;
-    }
-
-    const windowDiv = document.createElement('div');
-    windowDiv.className = 'multi-window';
-    windowDiv.style.left = `${Math.random() * (window.innerWidth - 300)}px`;
-    windowDiv.style.top = `${Math.random() * (window.innerHeight - 200)}px`;
-
-    const header = document.createElement('div');
-    header.className = 'multi-window-header';
-    header.innerHTML = `<span>${channelName}</span><button class="multi-window-close" onclick="closeMultiWindow('${streamIndex}')">×</button>`;
-    windowDiv.appendChild(header);
-
-    const video = document.createElement('video');
-    video.className = 'multi-window-video';
-    video.controls = true;
-    video.autoplay = true;
-    windowDiv.appendChild(video);
-
-    multiWindowContainer.appendChild(windowDiv);
-
-    let hls;
-    const streamUrl = playlist.length ? playlist[parseInt(streamIndex)].url : `${baseUrl.split('/player_api.php')[0]}/live/${username}/${password}/${streamIndex}.m3u8`;
-    if (Hls.isSupported()) {
-        hls = new Hls();
-        hls.loadSource(streamUrl);
-        hls.attachMedia(video);
-    } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-        video.src = streamUrl;
-    }
-
-    makeDraggable(windowDiv);
-    multiWindows[streamIndex] = { window: windowDiv, video, hls };
-    localStorage.setItem('multiWindows', JSON.stringify(Object.keys(multiWindows)));
-}
-
-function closeMultiWindow(streamIndex) {
-    const win = multiWindows[streamIndex];
-    if (win) {
-        if (win.hls) win.hls.destroy();
-        win.window.remove();
-        delete multiWindows[streamIndex];
-        localStorage.setItem('multiWindows', JSON.stringify(Object.keys(multiWindows)));
-    }
-}
-
-function makeDraggable(element) {
-    let pos1 = 0, pos2 = 0, pos3 = 0, pos4 = 0;
-    element.querySelector('.multi-window-header').onmousedown = dragMouseDown;
-
-    function dragMouseDown(e) {
-        e.preventDefault();
-        pos3 = e.clientX;
-        pos4 = e.clientY;
-        document.onmouseup = closeDragElement;
-        document.onmousemove = elementDrag;
-    }
-
-    function elementDrag(e) {
-        e.preventDefault();
-        pos1 = pos3 - e.clientX;
-        pos2 = pos4 - e.clientY;
-        pos3 = e.clientX;
-        pos4 = e.clientY;
-        element.style.top = (element.offsetTop - pos2) + "px";
-        element.style.left = (element.offsetLeft - pos1) + "px";
-    }
-
-    function closeDragElement() {
-        document.onmouseup = null;
-        document.onmousemove = null;
-    }
-}
+function rewind() { videoPlayer.currentTime -= 10; }
+function fastForward() { videoPlayer.currentTime += 10; }
 
 async function loadSubtitles() {
     const file = document.getElementById('subtitle-file').files[0];
@@ -1147,19 +933,24 @@ function handleModalClose() {
         currentHls.destroy();
         currentHls = null;
     }
-    epgContainer.classList.add('d-none');
+    epgContainer.style.display = 'none';
 }
 
 async function loadEPG(streamId) {
-    if (playlist.length) return playlist[parseInt(streamId)].epg || [];
+    if (playlist.length) return;
     try {
         const response = await fetch(`${baseUrl}&action=get_short_epg&stream_id=${streamId}&limit=5`);
         if (!response.ok) throw new Error('Invalid response from server.');
         const data = await response.json();
-        return data.epg_listings || [];
+        if (data.epg_listings && data.epg_listings.length > 0) {
+            displayEPG(data.epg_listings);
+            epgContainer.style.display = 'block';
+        } else {
+            epgContainer.style.display = 'none';
+        }
     } catch (error) {
         console.error('Error fetching EPG:', error);
-        return [];
+        epgContainer.style.display = 'none';
     }
 }
 
@@ -1210,17 +1001,13 @@ function displayRecommendations() {
                                     </div>
                                 </div>
                                 <div class="channel-actions">
-                                    <button class="fav-btn ${favorites.includes(ch.index) ? 'active' : ''}" onclick="toggleFavorite(${ch.index}, event)">
+                                    <button class="fav-btn ${favorites.includes(ch.index) ? 'active' : ''}" 
+                                            onclick="toggleFavorite(${ch.index}, event)">
                                         <i class="fas fa-star"></i>
                                     </button>
-                                    <button class="watch-later-btn ${watchLater.includes(ch.index) ? 'active' : ''}" onclick="toggleWatchLater(${ch.index}, event)">
+                                    <button class="watch-later-btn ${watchLater.includes(ch.index) ? 'active' : ''}" 
+                                            onclick="toggleWatchLater(${ch.index}, event)">
                                         <i class="fas fa-clock"></i>
-                                    </button>
-                                    <button class="playlist-btn" onclick="addToPlaylist(${ch.index}, event)">
-                                        <i class="fas fa-list"></i>
-                                    </button>
-                                    <button class="multi-window-btn" onclick="openMultiWindow('${ch.index}', '${ch.name}', event)">
-                                        <i class="fas fa-tv"></i>
                                     </button>
                                     <button class="share-btn" onclick="shareChannel('${ch.name}', '${ch.url}', event)">
                                         <i class="fas fa-share-alt"></i>
